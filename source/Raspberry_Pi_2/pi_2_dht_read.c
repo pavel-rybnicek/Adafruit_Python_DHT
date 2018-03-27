@@ -20,6 +20,7 @@
 // SOFTWARE.
 #include <stdbool.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "pi_2_dht_read.h"
 #include "pi_2_mmio.h"
@@ -33,7 +34,7 @@
 // Number of bit pulses to expect from the DHT.  Note that this is 41 because
 // the first pulse is a constant 50 microsecond pulse, with 40 pulses to represent
 // the data afterwards.
-#define DHT_PULSES 41
+#define DHT_PULSES 42
 
 int pi_2_dht_read(int type, int pin, float* humidity, float* temperature) {
   // Validate humidity and temperature arguments and set them to zero.
@@ -113,7 +114,7 @@ int pi_2_dht_read(int type, int pin, float* humidity, float* temperature) {
   // Compute the average low pulse width to use as a 50 microsecond reference threshold.
   // Ignore the first two readings because they are a constant 80 microsecond pulse.
   uint32_t threshold = 0;
-  for (int i=2; i < DHT_PULSES*2; i+=2) {
+  for (int i=4; i < DHT_PULSES*2; i+=2) {
     threshold += pulseCounts[i];
   }
   threshold /= DHT_PULSES-1;
@@ -122,8 +123,8 @@ int pi_2_dht_read(int type, int pin, float* humidity, float* temperature) {
   // If the count is less than 50us it must be a ~28us 0 pulse, and if it's higher
   // then it must be a ~70us 1 pulse.
   uint8_t data[5] = {0};
-  for (int i=3; i < DHT_PULSES*2; i+=2) {
-    int index = (i-3)/16;
+  for (int i=5; i < DHT_PULSES*2; i+=2) {
+    int index = (i-5)/16;
     data[index] <<= 1;
     if (pulseCounts[i] >= threshold) {
       // One bit for long pulse.
@@ -133,7 +134,8 @@ int pi_2_dht_read(int type, int pin, float* humidity, float* temperature) {
   }
 
   // Useful debug info:
-  //printf("Data: 0x%x 0x%x 0x%x 0x%x 0x%x\n", data[0], data[1], data[2], data[3], data[4]);
+  printf("Data: 0x%x 0x%x 0x%x 0x%x 0x%x\n", data[0], data[1], data[2], data[3], data[4]);
+  printf("Chksum: 0x%x \n", (data[0]+ data[1]+ data[2]+ data[3]) & 0xFF);
 
   // Verify checksum of received data.
   if (data[4] == ((data[0] + data[1] + data[2] + data[3]) & 0xFF)) {
